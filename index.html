@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hotel POS Pro</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        :root {
+            --primary: #FF6B35;
+            --primary-light: #FF9F1C;
+            --white: #FFFFFF;
+            --gray: #F8F9FA;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--gray);
+        }
+
+        .pos-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: 100vh;
+            gap: 1px;
+            background: var(--primary-light);
+        }
+
+        .sidebar {
+            background: var(--white);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 12px rgba(255,107,53,0.1);
+        }
+
+        .order-header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .order-type button {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid var(--white);
+            color: var(--white);
+            margin: 5px;
+            padding: 8px 15px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .order-type button.active {
+            background: var(--white);
+            color: var(--primary);
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            padding: 15px 0;
+        }
+
+        .product-card {
+            background: var(--white);
+            border: 2px solid var(--primary-light);
+            border-radius: 12px;
+            padding: 15px;
+            transition: transform 0.2s;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .product-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(255,107,53,0.1);
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--gray);
+            border-radius: 8px;
+        }
+
+        .checkout-btn {
+            background: var(--primary);
+            color: var(--white);
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+
+        .checkout-btn:hover {
+            background: #FF5722;
+        }
+
+        .history-page {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .history-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            padding: 12px;
+            font-weight: bold;
+            background: var(--primary-light);
+            color: var(--white);
+            border-radius: 8px 8px 0 0;
+            gap: 10px;
+        }
+
+        .history-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            padding: 12px;
+            border-bottom: 2px solid var(--gray);
+            gap: 10px;
+            align-items: center;
+        }
+
+        .order-type-label {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .dine-in { background: #FF6B35; color: white; }
+        .takeout { background: #FF9F1C; color: white; }
+        .delivery { background: #FFB347; color: white; }
+        .room-service { background: #FF4500; color: white; }
+
+        .nav-tabs button {
+            background: none;
+            border: none;
+            padding: 15px 25px;
+            margin: 0 5px;
+            color: var(--white);
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav-tabs button.active {
+            border-color: var(--primary);
+            font-weight: bold;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--primary-light);
+            border-radius: 8px;
+            margin: 15px 0;
+            transition: border-color 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="pos-container">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="order-header">
+                    <h2>Active Order</h2>
+                    <div class="order-type">
+                        <button v-for="type in orderTypes" 
+                                :key="type"
+                                @click="currentOrderType = type"
+                                :class="{active: currentOrderType === type}">
+                            {{ typeLabels[type] }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="order-items">
+                    <div v-for="(item, index) in currentOrder" 
+                         :key="index" 
+                         class="order-item">
+                        <span>{{ item.name }} x{{ item.quantity }}</span>
+                        <span>${{ (item.price * item.quantity).toFixed(2) }}</span>
+                        <button @click="removeItem(index)">×</button>
+                    </div>
+                </div>
+
+                <div class="order-total">
+                    <button @click="completeOrder" class="checkout-btn">
+                        Complete Order (${{ totalAmount.toFixed(2) }})
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <div class="nav-tabs">
+                    <button :class="{active: currentPage === 'menu'}" 
+                            @click="currentPage = 'menu'">
+                        Menu
+                    </button>
+                    <button :class="{active: currentPage === 'history'}" 
+                            @click="currentPage = 'history'">
+                        History
+                    </button>
+                </div>
+
+                <!-- Menu Page -->
+                <div v-if="currentPage === 'menu'">
+                    <input type="text" 
+                           class="search-bar" 
+                           placeholder="🔍 Search products..."
+                           v-model="searchQuery">
+
+                    <div class="products-grid">
+                        <div v-for="product in filteredProducts" 
+                             :key="product.id" 
+                             class="product-card"
+                             @click="addToOrder(product)">
+                            <h4>{{ product.name }}</h4>
+                            <p>${{ product.price.toFixed(2) }}</p>
+                            <small>Stock: {{ product.stock }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Page -->
+                <div v-if="currentPage === 'history'" class="history-page">
+                    <div class="history-header">
+                        <span>Time</span>
+                        <span>Type</span>
+                        <span>Items</span>
+                        <span>Total</span>
+                    </div>
+                    <div class="history-list">
+                        <div v-for="order in filteredHistory" 
+                             :key="order.id" 
+                             class="history-item">
+                            <span>{{ formatTime(order.timestamp) }}</span>
+                            <span class="order-type-label" :class="order.type">
+                                {{ typeLabels[order.type] }}
+                            </span>
+                            <span>{{ order.items.length }} items</span>
+                            <span>${{ order.total.toFixed(2) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    currentPage: 'menu',
+                    searchQuery: '',
+                    currentOrderType: 'dine-in',
+                    currentOrder: [],
+                    orderHistory: [],
+                    products: [
+                        { id: 1, name: 'Premium Breakfast', price: 24.99, stock: 10 },
+                        { id: 2, name: 'Spa Package', price: 89.99, stock: 5 },
+                        { id: 3, name: 'Dinner Special', price: 45.99, stock: 8 }
+                    ],
+                    orderTypes: ['dine-in', 'takeout', 'delivery', 'room-service'],
+                    typeLabels: {
+                        'dine-in': '🍽️ Dine In',
+                        'takeout': '🥡 Takeout',
+                        'delivery': '🚚 Delivery',
+                        'room-service': '🛎️ Room Service'
+                    }
+                }
+            },
+            computed: {
+                filteredProducts() {
+                    return this.products.filter(product => {
+                        const matchesSearch = product.name.toLowerCase().includes(this.searchQuery.toLowerCase())
+                        return matchesSearch && product.stock > 0
+                    })
+                },
+                totalAmount() {
+                    return this.currentOrder.reduce((total, item) => total + (item.price * item.quantity), 0)
+                },
+                filteredHistory() {
+                    return this.orderHistory
+                }
+            },
+            methods: {
+                addToOrder(product) {
+                    const existing = this.currentOrder.find(item => item.id === product.id)
+                    if (existing) {
+                        existing.quantity++
+                    } else {
+                        this.currentOrder.push({...product, quantity: 1})
+                    }
+                    product.stock--
+                },
+                removeItem(index) {
+                    const item = this.currentOrder[index]
+                    this.products.find(p => p.id === item.id).stock += item.quantity
+                    this.currentOrder.splice(index, 1)
+                },
+                completeOrder() {
+                    const order = {
+                        id: Date.now(),
+                        timestamp: new Date().getTime(),
+                        type: this.currentOrderType,
+                        items: [...this.currentOrder],
+                        total: this.totalAmount
+                    }
+                    
+                    this.orderHistory.unshift(order)
+                    this.currentOrder = []
+                    this.printReceipt(order)
+                },
+                printReceipt(order) {
+                    const receiptWindow = window.open('', '_blank')
+                    receiptWindow.document.write(`
+                        <h2>Hotel POS Receipt</h2>
+                        <p>Date: ${new Date(order.timestamp).toLocaleString()}</p>
+                        <p>Order Type: ${this.typeLabels[order.type]}</p>
+                        <hr>
+                        ${order.items.map(item => `
+                            <p>${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)}</p>
+                        `).join('')}
+                        <hr>
+                        <h3>Total: $${order.total.toFixed(2)}</h3>
+                    `)
+                    receiptWindow.document.close()
+                    receiptWindow.print()
+                },
+                formatTime(timestamp) {
+                    const date = new Date(timestamp)
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
